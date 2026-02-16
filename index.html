@@ -188,6 +188,7 @@
       z-index: 200;
       display: none;
       background: #000;
+      cursor: default;   /* override #root's cursor:none */
     }
 
     #end-screen.visible {
@@ -199,7 +200,7 @@
       height: 100%;
       object-fit: contain;
       object-position: center;
-      cursor: pointer;
+      cursor: default;   /* pointer shown only over QR hotspot via JS */
       display: block;
     }
   </style>
@@ -267,15 +268,19 @@
     const END_FADE_DURATION  = 1500; // ms — black overlay fade
     const END_PAUSE_BEFORE_SWAP = 500; // ms — pause at black before end screen
 
-    // TV screen bounds as % of XI.jpeg rendered dimensions
-    const TV_BOUNDS_PCT = { left: 8, top: 9, right: 92, bottom: 84 };
+    // TV screen bounds as % of XI.jpeg rendered dimensions (inner screen, excluding bezel/stand)
+    const TV_BOUNDS_PCT     = { left: 11, top: 7,  right: 89, bottom: 68 };
 
-    // Laptop screen bounds as % of X.jpeg rendered dimensions
-    const LAPTOP_BOUNDS_PCT = { left: 12, top: 5, right: 88, bottom: 76 };
+    // Laptop screen bounds as % of X.jpeg rendered dimensions (inner screen, excluding keyboard base)
+    const LAPTOP_BOUNDS_PCT = { left: 11, top: 5,  right: 89, bottom: 65 };
 
-    // Phone screen bounds as % of VIEWPORT
-    // ⚠ CALIBRATION NEEDED: adjust after visually inspecting IX.avif in-browser
-    const PHONE_BOUNDS_VIEWPORT_PCT = { left: 38, top: 22, right: 62, bottom: 72 };
+    // Phone screen bounds as % of IX.avif image dimensions (center ~80% per user confirmation)
+    // ⚠ Adjust if phone screen edges don't align after viewing in-browser
+    const PHONE_BOUNDS_PCT  = { left: 10, top: 10, right: 90, bottom: 90 };
+
+    // QR code region in XII.avif (bottom-left corner) — as fractions 0–1 of rendered image
+    // ⚠ Adjust if the QR code hotspot doesn't align after viewing in-browser
+    const QR_BOUNDS = { left: 0.03, top: 0.72, right: 0.28, bottom: 0.97 };
 
     const BUBBLE_COUNT    = 12;
     const BUBBLE_MIN_SIZE = 30;  // px
@@ -362,16 +367,6 @@
       };
     }
 
-    /** Phone uses viewport percentages directly. */
-    function computePhoneBoundsFromViewport(pct) {
-      return {
-        left:   window.innerWidth  * (pct.left   / 100),
-        top:    window.innerHeight * (pct.top    / 100),
-        right:  window.innerWidth  * (pct.right  / 100),
-        bottom: window.innerHeight * (pct.bottom / 100),
-      };
-    }
-
     function clamp(val, min, max) {
       return Math.max(min, Math.min(max, val));
     }
@@ -403,7 +398,7 @@
     // ============================================================
 
     function enterPhoneState() {
-      currentBounds = computePhoneBoundsFromViewport(PHONE_BOUNDS_VIEWPORT_PCT);
+      currentBounds = computeBoundsFromImage(elBg, PHONE_BOUNDS_PCT);
       cursorX = clamp(cursorX, currentBounds.left, currentBounds.right);
       cursorY = clamp(cursorY, currentBounds.top,  currentBounds.bottom);
       placeCursorAt(cursorX, cursorY);
@@ -696,9 +691,10 @@
     function setupInitialScene() {
       elBg.onload = null;
       elBg.onload = () => {
-        // Place cursor at horizontal center, ~60% down viewport
-        cursorX = window.innerWidth  / 2;
-        cursorY = window.innerHeight * 0.60;
+        // Place cursor within the phone's screen area (65% down from the screen top)
+        const phoneBounds = computeBoundsFromImage(elBg, PHONE_BOUNDS_PCT);
+        cursorX = (phoneBounds.left + phoneBounds.right) / 2;
+        cursorY = phoneBounds.top + (phoneBounds.bottom - phoneBounds.top) * 0.65;
         placeCursorAt(cursorX, cursorY);
 
         // Position instruction text 48px below cursor tip
@@ -721,7 +717,7 @@
       switch (currentState) {
         case STATE.IDLE:
         case STATE.PHONE:
-          currentBounds = computePhoneBoundsFromViewport(PHONE_BOUNDS_VIEWPORT_PCT);
+          currentBounds = computeBoundsFromImage(elBg, PHONE_BOUNDS_PCT);
           break;
         case STATE.TV:
           currentBounds = computeBoundsFromImage(elBg, TV_BOUNDS_PCT);
@@ -746,7 +742,23 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       createBubbles();
-      elEndImage.addEventListener('click', resetToStart);
+      elEndImage.addEventListener('click', (e) => {
+        const rect = elEndImage.getBoundingClientRect();
+        const relX = (e.clientX - rect.left) / (rect.right  - rect.left);
+        const relY = (e.clientY - rect.top)  / (rect.bottom - rect.top);
+        if (relX >= QR_BOUNDS.left && relX <= QR_BOUNDS.right &&
+            relY >= QR_BOUNDS.top  && relY <= QR_BOUNDS.bottom) {
+          resetToStart();
+        }
+      });
+      elEndImage.addEventListener('mousemove', (e) => {
+        const rect = elEndImage.getBoundingClientRect();
+        const relX = (e.clientX - rect.left) / (rect.right  - rect.left);
+        const relY = (e.clientY - rect.top)  / (rect.bottom - rect.top);
+        const overQR = relX >= QR_BOUNDS.left && relX <= QR_BOUNDS.right &&
+                       relY >= QR_BOUNDS.top  && relY <= QR_BOUNDS.bottom;
+        elEndImage.style.cursor = overQR ? 'pointer' : 'default';
+      });
       setupInitialScene();
     });
   </script>
