@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prototype III</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+    }
+
+    #root {
+      position: fixed;
+      inset: 0;
+      cursor: none;
+      overflow: hidden;
+    }
+
+    /* ── Background image ── */
+    #bg-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      z-index: 1;
+      display: block;
+    }
+
+    /* ── Bubble container ── */
+    #bubble-container {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: none;
+      overflow: hidden;
+    }
+
+    #bubble-container.visible {
+      display: block;
+    }
+
+    .bubble {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.75;
+    }
+
+    @keyframes bubbleFloat {
+      0%   { transform: translateY(0);       opacity: 0.75; }
+      50%  { opacity: 0.9; }
+      100% { transform: translateY(-150vh);  opacity: 0; }
+    }
+
+    /* ── Laptop gradient overlay ── */
+    #laptop-gradient {
+      position: absolute;
+      z-index: 11;
+      pointer-events: none;
+      display: none;
+      background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0)   0%,
+        rgba(255, 255, 255, 0)  15%,
+        rgba(0,   0,   0, 0.35) 55%,
+        rgba(0,   0,   0, 0.85) 82%,
+        rgba(0,   0,   0, 1)   100%
+      );
+    }
+
+    #laptop-gradient.visible {
+      display: block;
+    }
+
+    /* ── Custom cursor ── */
+    #cursor {
+      position: absolute;
+      width: 32px;
+      height: auto;
+      z-index: 100;
+      pointer-events: none;
+      transform-origin: top left;
+      display: none;
+    }
+
+    @keyframes cursorFallDown {
+      0%   { transform: translateY(0);     opacity: 1; }
+      55%  { opacity: 0.9; }
+      100% { transform: translateY(220px); opacity: 0; }
+    }
+
+    .cursor-falling {
+      animation: cursorFallDown 0.8s ease-in forwards;
+    }
+
+    /* ── Instruction text ── */
+    #instruction {
+      position: absolute;
+      z-index: 101;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 0.95rem;
+      letter-spacing: 0.02em;
+      text-align: center;
+      white-space: nowrap;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+      /* translateX(-50%) centers the text on the cursor's x position */
+      transform: translateX(-50%);
+      pointer-events: none;
+      user-select: none;
+      display: none;
+    }
+
+    .key-group {
+      display: inline-flex;
+      gap: 4px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    kbd.arrow-key {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      border: 1.5px solid rgba(255, 255, 255, 0.65);
+      border-radius: 4px;
+      border-bottom-width: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(4px);
+      color: #fff;
+      font-size: 0.72rem;
+      font-family: system-ui, sans-serif;
+      line-height: 1;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    @keyframes instructionFadeUp {
+      0%   { transform: translateX(-50%) translateY(0);     opacity: 1; }
+      100% { transform: translateX(-50%) translateY(-80px); opacity: 0; }
+    }
+
+    .instruction-hiding {
+      animation: instructionFadeUp 0.5s ease-out forwards;
+    }
+
+    /* ── Black overlay ── */
+    #black-overlay {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      z-index: 150;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    @keyframes blackFadeIn {
+      0%   { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    .overlay-fading-in {
+      animation: blackFadeIn 1.5s ease-in forwards;
+      pointer-events: auto;
+    }
+
+    .overlay-solid {
+      opacity: 1 !important;
+      pointer-events: auto;
+    }
+
+    /* ── End screen ── */
+    #end-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 200;
+      display: none;
+      background: #000;
+    }
+
+    #end-screen.visible {
+      display: block;
+    }
+
+    #end-image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      cursor: pointer;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="root">
+
+    <!-- Layer 1: Scene background -->
+    <img id="bg-image" src="" alt="">
+
+    <!-- Layer 2: TV bubbles -->
+    <div id="bubble-container"></div>
+
+    <!-- Layer 3: Laptop screen gradient -->
+    <div id="laptop-gradient"></div>
+
+    <!-- Layer 4: Custom cursor -->
+    <img id="cursor" src="Prototype III_Mouse.png" alt="">
+
+    <!-- Layer 5: Instruction text -->
+    <div id="instruction">
+      move with
+      <span class="key-group">
+        <kbd class="arrow-key">&#8592;</kbd>
+        <kbd class="arrow-key">&#8593;</kbd>
+        <kbd class="arrow-key">&#8595;</kbd>
+        <kbd class="arrow-key">&#8594;</kbd>
+      </span>
+    </div>
+
+    <!-- Layer 6: Fade-to-black overlay -->
+    <div id="black-overlay"></div>
+
+    <!-- Layer 7: End screen -->
+    <div id="end-screen">
+      <!--
+        QR CODE CLICK REGION:
+        Currently the entire #end-image is clickable.
+        To refine to just the QR code area, measure its position in XII.avif visually,
+        then either use a positioned hotspot <div> or filter clicks by relX/relY ratio.
+      -->
+      <img id="end-image"
+           src="IXD-106-01_Week III Homework_Visual Reference_XII.avif"
+           alt="End screen — click QR code to restart">
+    </div>
+
+  </div>
+
+  <script>
+    // ============================================================
+    // CONSTANTS — Adjust to calibrate screen bounds
+    // ============================================================
+
+    const ASSETS = {
+      PHONE:  'IXD-106-01_Week III Homework_Visual Reference_IX.avif',
+      TV:     'IXD-106-01_Week III Homework_Visual Reference_XI.jpeg',
+      LAPTOP: 'IXD-106-01_Week III Homework_Visual Reference_X.jpeg',
+      END:    'IXD-106-01_Week III Homework_Visual Reference_XII.avif',
+    };
+
+    const CURSOR_SPEED       = 4;    // px per rAF frame (~60 fps)
+    const FALL_DURATION      = 800;  // ms — cursor fall animation
+    const POST_FALL_PAUSE    = 700;  // ms — pause before re-enabling controls
+    const END_FADE_DURATION  = 1500; // ms — black overlay fade
+    const END_PAUSE_BEFORE_SWAP = 500; // ms — pause at black before end screen
+
+    // TV screen bounds as % of XI.jpeg rendered dimensions
+    const TV_BOUNDS_PCT = { left: 8, top: 9, right: 92, bottom: 84 };
+
+    // Laptop screen bounds as % of X.jpeg rendered dimensions
+    const LAPTOP_BOUNDS_PCT = { left: 12, top: 5, right: 88, bottom: 76 };
+
+    // Phone screen bounds as % of VIEWPORT
+    // ⚠ CALIBRATION NEEDED: adjust after visually inspecting IX.avif in-browser
+    const PHONE_BOUNDS_VIEWPORT_PCT = { left: 38, top: 22, right: 62, bottom: 72 };
+
+    const BUBBLE_COUNT    = 12;
+    const BUBBLE_MIN_SIZE = 30;  // px
+    const BUBBLE_MAX_SIZE = 80;  // px
+    const BUBBLE_COLORS   = [
+      'hsl(0,   80%, 80%)',
+      'hsl(30,  80%, 80%)',
+      'hsl(60,  80%, 80%)',
+      'hsl(120, 60%, 78%)',
+      'hsl(180, 60%, 78%)',
+      'hsl(210, 70%, 80%)',
+      'hsl(270, 70%, 82%)',
+      'hsl(300, 60%, 82%)',
+      'hsl(45,  80%, 80%)',
+      'hsl(150, 60%, 78%)',
+      'hsl(0,   60%, 85%)',
+      'hsl(240, 60%, 84%)',
+    ];
+
+    // ============================================================
+    // STATE MACHINE
+    // ============================================================
+
+    const STATE = {
+      IDLE:             'IDLE',
+      PHONE:            'PHONE',
+      PHONE_TO_TV:      'PHONE_TO_TV',
+      TV:               'TV',
+      TV_TO_COMPUTER:   'TV_TO_COMPUTER',
+      COMPUTER:         'COMPUTER',
+      COMPUTER_TO_END:  'COMPUTER_TO_END',
+      END:              'END',
+    };
+
+    let currentState   = STATE.IDLE;
+    let controlsActive = false;
+    let cursorX        = 0;
+    let cursorY        = 0;
+    let currentBounds  = null;
+    let rafHandle      = null;
+
+    const heldKeys = {
+      ArrowLeft:  false,
+      ArrowRight: false,
+      ArrowUp:    false,
+      ArrowDown:  false,
+    };
+
+    // ============================================================
+    // DOM REFERENCES
+    // ============================================================
+
+    const elBg             = document.getElementById('bg-image');
+    const elBubbleContainer = document.getElementById('bubble-container');
+    const elLaptopGradient = document.getElementById('laptop-gradient');
+    const elCursor         = document.getElementById('cursor');
+    const elInstruction    = document.getElementById('instruction');
+    const elBlackOverlay   = document.getElementById('black-overlay');
+    const elEndScreen      = document.getElementById('end-screen');
+    const elEndImage       = document.getElementById('end-image');
+
+    // ============================================================
+    // COORDINATE HELPERS
+    // ============================================================
+
+    /**
+     * Compute screen bounds in viewport px from percentage constants,
+     * accounting for object-fit:contain letterboxing on the bg image.
+     */
+    function computeBoundsFromImage(imgEl, pct) {
+      const rect  = imgEl.getBoundingClientRect();
+      const natW  = imgEl.naturalWidth;
+      const natH  = imgEl.naturalHeight;
+      const scale = Math.min(rect.width / natW, rect.height / natH);
+      const rendW = natW * scale;
+      const rendH = natH * scale;
+      const imgLeft = rect.left + (rect.width  - rendW) / 2;
+      const imgTop  = rect.top  + (rect.height - rendH) / 2;
+      return {
+        left:   imgLeft + natW * (pct.left   / 100) * scale,
+        top:    imgTop  + natH * (pct.top    / 100) * scale,
+        right:  imgLeft + natW * (pct.right  / 100) * scale,
+        bottom: imgTop  + natH * (pct.bottom / 100) * scale,
+      };
+    }
+
+    /** Phone uses viewport percentages directly. */
+    function computePhoneBoundsFromViewport(pct) {
+      return {
+        left:   window.innerWidth  * (pct.left   / 100),
+        top:    window.innerHeight * (pct.top    / 100),
+        right:  window.innerWidth  * (pct.right  / 100),
+        bottom: window.innerHeight * (pct.bottom / 100),
+      };
+    }
+
+    function clamp(val, min, max) {
+      return Math.max(min, Math.min(max, val));
+    }
+
+    function placeCursorAt(x, y) {
+      elCursor.style.left = x + 'px';
+      elCursor.style.top  = y + 'px';
+    }
+
+    // ============================================================
+    // STATE MACHINE DISPATCHER
+    // ============================================================
+
+    function transitionTo(newState) {
+      currentState = newState;
+      switch (newState) {
+        case STATE.PHONE:           enterPhoneState();          break;
+        case STATE.PHONE_TO_TV:     enterPhoneToTVState();      break;
+        case STATE.TV:              enterTVState();             break;
+        case STATE.TV_TO_COMPUTER:  enterTVToComputerState();   break;
+        case STATE.COMPUTER:        enterComputerState();       break;
+        case STATE.COMPUTER_TO_END: enterComputerToEndState();  break;
+        case STATE.END:             enterEndState();            break;
+      }
+    }
+
+    // ============================================================
+    // STATE ENTRY FUNCTIONS
+    // ============================================================
+
+    function enterPhoneState() {
+      currentBounds = computePhoneBoundsFromViewport(PHONE_BOUNDS_VIEWPORT_PCT);
+      cursorX = clamp(cursorX, currentBounds.left, currentBounds.right);
+      cursorY = clamp(cursorY, currentBounds.top,  currentBounds.bottom);
+      placeCursorAt(cursorX, cursorY);
+      controlsActive = true;
+      startRAFLoop();
+    }
+
+    function enterPhoneToTVState() {
+      controlsActive = false;
+      stopRAFLoop();
+      elCursor.classList.add('cursor-falling');
+
+      setTimeout(() => {
+        elCursor.classList.remove('cursor-falling');
+        elCursor.style.opacity = '0';
+        loadBg(ASSETS.TV, () => {
+          currentBounds = computeBoundsFromImage(elBg, TV_BOUNDS_PCT);
+          cursorX = (currentBounds.left + currentBounds.right) / 2;
+          cursorY = currentBounds.top + 12;
+          placeCursorAt(cursorX, cursorY);
+          elCursor.style.opacity = '1';
+          showBubbles();
+          transitionTo(STATE.TV);
+        });
+      }, FALL_DURATION);
+    }
+
+    function enterTVState() {
+      setTimeout(() => {
+        controlsActive = true;
+        startRAFLoop();
+      }, POST_FALL_PAUSE);
+    }
+
+    function enterTVToComputerState() {
+      controlsActive = false;
+      stopRAFLoop();
+      elCursor.classList.add('cursor-falling');
+
+      setTimeout(() => {
+        elCursor.classList.remove('cursor-falling');
+        elCursor.style.opacity = '0';
+        hideBubbles();
+        loadBg(ASSETS.LAPTOP, () => {
+          currentBounds = computeBoundsFromImage(elBg, LAPTOP_BOUNDS_PCT);
+          cursorX = (currentBounds.left + currentBounds.right) / 2;
+          cursorY = currentBounds.top + 12;
+          placeCursorAt(cursorX, cursorY);
+          elCursor.style.opacity = '1';
+          positionLaptopGradient(currentBounds);
+          elLaptopGradient.classList.add('visible');
+          transitionTo(STATE.COMPUTER);
+        });
+      }, FALL_DURATION);
+    }
+
+    function enterComputerState() {
+      setTimeout(() => {
+        controlsActive = true;
+        startRAFLoop();
+      }, POST_FALL_PAUSE);
+    }
+
+    function enterComputerToEndState() {
+      controlsActive = false;
+      stopRAFLoop();
+      elCursor.style.display = 'none';
+
+      // Fade to black
+      elBlackOverlay.classList.add('overlay-fading-in');
+
+      setTimeout(() => {
+        elBlackOverlay.classList.remove('overlay-fading-in');
+        elBlackOverlay.classList.add('overlay-solid');
+
+        setTimeout(() => {
+          transitionTo(STATE.END);
+        }, END_PAUSE_BEFORE_SWAP);
+      }, END_FADE_DURATION);
+    }
+
+    function enterEndState() {
+      // Remove black overlay (end screen is on top anyway)
+      elBlackOverlay.classList.remove('overlay-solid');
+      elBlackOverlay.style.opacity = '0';
+      elLaptopGradient.classList.remove('visible');
+      elBg.style.display = 'none';
+      // Show end screen instantly
+      elEndScreen.classList.add('visible');
+    }
+
+    // ============================================================
+    // RAF MOVEMENT LOOP
+    // ============================================================
+
+    function startRAFLoop() {
+      if (rafHandle !== null) return;
+      rafHandle = requestAnimationFrame(rafTick);
+    }
+
+    function stopRAFLoop() {
+      if (rafHandle !== null) {
+        cancelAnimationFrame(rafHandle);
+        rafHandle = null;
+      }
+    }
+
+    function rafTick() {
+      if (!controlsActive) { rafHandle = null; return; }
+
+      let dx = 0, dy = 0;
+      if (heldKeys.ArrowLeft)  dx -= CURSOR_SPEED;
+      if (heldKeys.ArrowRight) dx += CURSOR_SPEED;
+      if (heldKeys.ArrowUp)    dy -= CURSOR_SPEED;
+      if (heldKeys.ArrowDown)  dy += CURSOR_SPEED;
+
+      if (currentBounds) {
+        cursorX = clamp(cursorX + dx, currentBounds.left, currentBounds.right);
+        cursorY += dy;
+        if (cursorY < currentBounds.top)       cursorY = currentBounds.top;
+        if (cursorY >= currentBounds.bottom) {
+          cursorY = currentBounds.bottom;
+          placeCursorAt(cursorX, cursorY);
+          handleBottomHit();
+          rafHandle = null;
+          return;
+        }
+      }
+
+      placeCursorAt(cursorX, cursorY);
+      rafHandle = requestAnimationFrame(rafTick);
+    }
+
+    function handleBottomHit() {
+      switch (currentState) {
+        case STATE.PHONE:    transitionTo(STATE.PHONE_TO_TV);     break;
+        case STATE.TV:       transitionTo(STATE.TV_TO_COMPUTER);  break;
+        case STATE.COMPUTER: transitionTo(STATE.COMPUTER_TO_END); break;
+      }
+    }
+
+    // ============================================================
+    // INPUT HANDLING
+    // ============================================================
+
+    document.addEventListener('keydown', (e) => {
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+      e.preventDefault();
+
+      if (currentState === STATE.IDLE) {
+        hideInstruction();
+        transitionTo(STATE.PHONE);
+      }
+
+      if (controlsActive) {
+        heldKeys[e.key] = true;
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (Object.prototype.hasOwnProperty.call(heldKeys, e.key)) {
+        heldKeys[e.key] = false;
+      }
+    });
+
+    // ============================================================
+    // INSTRUCTION TEXT
+    // ============================================================
+
+    function hideInstruction() {
+      elInstruction.classList.add('instruction-hiding');
+      elInstruction.addEventListener('animationend', () => {
+        elInstruction.style.display = 'none';
+      }, { once: true });
+    }
+
+    // ============================================================
+    // BACKGROUND IMAGE LOADER
+    // ============================================================
+
+    function loadBg(src, callback) {
+      elBg.onload = null;
+      if (elBg.src.endsWith(encodeURIComponent(src).replace(/%20/g, '%20')) ||
+          elBg.src.endsWith(src)) {
+        // Same src — force callback
+        callback();
+      } else {
+        elBg.onload = callback;
+        elBg.src = src;
+      }
+    }
+
+    // ============================================================
+    // BUBBLES
+    // ============================================================
+
+    function createBubbles() {
+      for (let i = 0; i < BUBBLE_COUNT; i++) {
+        const div = document.createElement('div');
+        div.classList.add('bubble');
+        const size = BUBBLE_MIN_SIZE + Math.random() * (BUBBLE_MAX_SIZE - BUBBLE_MIN_SIZE);
+        div.style.width  = size + 'px';
+        div.style.height = size + 'px';
+        const color = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
+        div.style.background = color;
+        div.style.boxShadow  = `0 0 ${Math.round(size * 0.3)}px ${color}`;
+        div.dataset.size = size;
+        elBubbleContainer.appendChild(div);
+      }
+    }
+
+    function showBubbles() {
+      const bounds  = currentBounds;
+      const screenW = bounds.right  - bounds.left;
+      const screenH = bounds.bottom - bounds.top;
+
+      elBubbleContainer.querySelectorAll('.bubble').forEach((bubble) => {
+        const size     = parseFloat(bubble.dataset.size);
+        const maxX     = screenW - size;
+        const randomX  = bounds.left + Math.random() * maxX;
+        const offset   = Math.random() * screenH;
+        const startY   = bounds.bottom - offset;
+
+        bubble.style.left      = randomX + 'px';
+        bubble.style.top       = startY  + 'px';
+        bubble.style.bottom    = 'auto';
+
+        const duration = 8 + Math.random() * 6;
+        const delay    = -(Math.random() * 5);
+        bubble.style.animation =
+          `bubbleFloat ${duration}s ${delay}s ease-in-out infinite`;
+      });
+
+      elBubbleContainer.classList.add('visible');
+    }
+
+    function hideBubbles() {
+      elBubbleContainer.classList.remove('visible');
+      elBubbleContainer.querySelectorAll('.bubble').forEach((b) => {
+        b.style.animation = 'none';
+      });
+    }
+
+    // ============================================================
+    // LAPTOP GRADIENT
+    // ============================================================
+
+    function positionLaptopGradient(bounds) {
+      elLaptopGradient.style.left   = bounds.left                    + 'px';
+      elLaptopGradient.style.top    = bounds.top                     + 'px';
+      elLaptopGradient.style.width  = (bounds.right  - bounds.left)  + 'px';
+      elLaptopGradient.style.height = (bounds.bottom - bounds.top)   + 'px';
+    }
+
+    // ============================================================
+    // RESET
+    // ============================================================
+
+    function resetToStart() {
+      currentState   = STATE.IDLE;
+      controlsActive = false;
+      stopRAFLoop();
+      Object.keys(heldKeys).forEach((k) => { heldKeys[k] = false; });
+
+      elEndScreen.classList.remove('visible');
+      elBg.style.display = 'block';
+
+      elBlackOverlay.classList.remove('overlay-fading-in', 'overlay-solid');
+      elBlackOverlay.style.opacity = '0';
+
+      elLaptopGradient.classList.remove('visible');
+      hideBubbles();
+
+      elCursor.style.display = 'block';
+      elCursor.style.opacity = '1';
+      elCursor.classList.remove('cursor-falling');
+
+      elInstruction.style.display   = 'block';
+      elInstruction.style.opacity   = '1';
+      elInstruction.classList.remove('instruction-hiding');
+      elInstruction.style.transform = 'translateX(-50%)';
+
+      setupInitialScene();
+    }
+
+    // ============================================================
+    // INITIAL SETUP
+    // ============================================================
+
+    function setupInitialScene() {
+      elBg.onload = null;
+      elBg.onload = () => {
+        // Place cursor at horizontal center, ~60% down viewport
+        cursorX = window.innerWidth  / 2;
+        cursorY = window.innerHeight * 0.60;
+        placeCursorAt(cursorX, cursorY);
+
+        // Position instruction text 48px below cursor tip
+        elInstruction.style.left = cursorX + 'px';
+        elInstruction.style.top  = (cursorY + 48) + 'px';
+
+        elCursor.style.display     = 'block';
+        elInstruction.style.display = 'block';
+
+        currentState = STATE.IDLE;
+      };
+      elBg.src = ASSETS.PHONE;
+    }
+
+    // ============================================================
+    // RESIZE HANDLER
+    // ============================================================
+
+    window.addEventListener('resize', () => {
+      switch (currentState) {
+        case STATE.IDLE:
+        case STATE.PHONE:
+          currentBounds = computePhoneBoundsFromViewport(PHONE_BOUNDS_VIEWPORT_PCT);
+          break;
+        case STATE.TV:
+          currentBounds = computeBoundsFromImage(elBg, TV_BOUNDS_PCT);
+          hideBubbles();
+          showBubbles();
+          break;
+        case STATE.COMPUTER:
+          currentBounds = computeBoundsFromImage(elBg, LAPTOP_BOUNDS_PCT);
+          positionLaptopGradient(currentBounds);
+          break;
+      }
+      if (currentBounds) {
+        cursorX = clamp(cursorX, currentBounds.left, currentBounds.right);
+        cursorY = clamp(cursorY, currentBounds.top,  currentBounds.bottom);
+        placeCursorAt(cursorX, cursorY);
+      }
+    });
+
+    // ============================================================
+    // ENTRY POINT
+    // ============================================================
+
+    document.addEventListener('DOMContentLoaded', () => {
+      createBubbles();
+      elEndImage.addEventListener('click', resetToStart);
+      setupInitialScene();
+    });
+  </script>
+
+</body>
+</html>
